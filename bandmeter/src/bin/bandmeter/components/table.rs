@@ -39,12 +39,8 @@ fn render_key_with_bar(
 ) -> Div {
     let max_bar_width = key_width - *CELL_P_X;
 
-    let total_val = download + upload;
-    let frac_total_to_max = total_val as f64 / max_val as f64;
-    let frac_down_to_total = download as f64 / total_val as f64;
-    let computed_bar_width = frac_total_to_max as f32 * max_bar_width;
-    let download_bar_width = frac_down_to_total as f32 * computed_bar_width;
-    let upload_bar_width = computed_bar_width - download_bar_width;
+    let download_bar_width = (download as f64 / max_val as f64) as f32 * max_bar_width;
+    let upload_bar_width = (upload as f64 / max_val as f64) as f32 * max_bar_width;
 
     let (key, key_color) = if let Some(key) = key {
         (key, theme.foreground)
@@ -61,7 +57,6 @@ fn render_key_with_bar(
             .child(div().text_color(key_color).child(key))
             .child(
                 div() // Bar
-                    .w(px(computed_bar_width))
                     .h_0p5()
                     .flex()
                     .child(
