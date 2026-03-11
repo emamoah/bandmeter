@@ -1,6 +1,6 @@
 # Bandmeter
 
-Per-process network usage monitor for Linux.
+Per-program network usage monitor for Linux.
 
 Built with [GPUI](https://www.gpui.rs/) and [Aya](https://aya-rs.dev/book/). Work in progress.
 
@@ -31,7 +31,7 @@ Create a systemd unit file as `/usr/lib/systemd/system/bandmeter.service`:
 
 ```systemd
 [Unit]
-Description=Per-process network usage monitor
+Description=Per-program network usage monitor
 
 [Service]
 Environment="DB_DIR=/path/to/db_dir"   # will be created if non-existent
