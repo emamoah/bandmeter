@@ -257,7 +257,7 @@ fn prepare_theme(window: &mut Window, cx: &mut App) {
     Theme::change(ThemeMode::Dark, Some(window), cx);
 
     let theme = Theme::global_mut(cx);
-    theme.table_row_border = theme.table_row_border.alpha(0.3);
+    theme.table_row_border = theme.transparent;
     theme.chart_1 = Hsla::from(rgb(0x3DAEE9));
     theme.chart_2 = Hsla::from(rgb(0x58E93D));
     theme.table_active_border = theme.chart_1;
