@@ -39,6 +39,10 @@ impl Period {
         }
     }
 
+    pub fn is_current(&self) -> bool {
+        Utc::now().timestamp() < self.bounds().1
+    }
+
     pub fn bounds(&self) -> (i64, i64) {
         match *self {
             Period::Hour(h) => (h, h + SECS_HOUR),
@@ -60,19 +64,27 @@ impl Period {
         (period_start..period_end).step_by(intvl as usize).count()
     }
 
-    pub fn prev(&mut self) {
+    pub fn prev(&mut self) -> bool {
         match *self {
             // Unchecked arithmetic because it's *impractical* to under/overflow
             Period::Hour(h) => *self = Period::Hour(h - SECS_HOUR),
             Period::Day(d) => *self = Period::Day(d - SECS_DAY),
         }
+
+        true
     }
 
-    pub fn next(&mut self) {
+    pub fn next(&mut self) -> bool {
+        if self.is_current() {
+            return false;
+        }
+
         match *self {
             Period::Hour(h) => *self = Period::Hour(h + SECS_HOUR),
             Period::Day(d) => *self = Period::Day(d + SECS_DAY),
         }
+
+        true
     }
 
     pub fn switch(&mut self, to: &PeriodType) {

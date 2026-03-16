@@ -2,7 +2,7 @@ use crate::period::*;
 use chrono::{DateTime, Datelike, Local, TimeZone};
 use gpui::{App, ClickEvent, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px};
 use gpui_component::{
-    IconName, Sizable,
+    Disableable, IconName, Sizable,
     button::{Button, ButtonVariants},
     h_flex,
 };
@@ -101,6 +101,7 @@ impl RenderOnce for PeriodEditor {
             )
             .child(
                 Button::new("period-next")
+                    .disabled(self.period.is_current())
                     .small()
                     .ghost()
                     .on_click(self.on_next)

@@ -161,9 +161,10 @@ impl Bandmeter {
     }
 
     fn next(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        self.period.next();
-        self.query_stats(cx);
-        cx.notify();
+        if self.period.next() {
+            self.query_stats(cx);
+            cx.notify();
+        }
     }
 
     fn tick_margin(&self) -> usize {
