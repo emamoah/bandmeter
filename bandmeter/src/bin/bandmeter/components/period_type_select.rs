@@ -1,10 +1,11 @@
+use crate::period::*;
 use gpui::{Entity, IntoElement, ParentElement, RenderOnce, Styled};
 use gpui_component::{
     ActiveTheme, Sizable, h_flex,
     select::{Select, SelectState},
 };
 
-type PeriodTypeSelectState = Entity<SelectState<Vec<&'static str>>>;
+type PeriodTypeSelectState = Entity<SelectState<Vec<PeriodType>>>;
 
 #[derive(IntoElement)]
 pub struct PeriodTypeSelect {

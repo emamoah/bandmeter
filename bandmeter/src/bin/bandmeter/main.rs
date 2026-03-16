@@ -48,7 +48,7 @@ struct Stats {
 }
 
 pub struct Bandmeter {
-    period_type_select: Entity<SelectState<Vec<&'static str>>>,
+    period_type_select: Entity<SelectState<Vec<PeriodType>>>,
     period: Period,
     db_manager: DBManager,
     stats: Stats,
@@ -60,7 +60,7 @@ impl Bandmeter {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let period_type_select = cx.new(|cx| {
             SelectState::new(
-                vec![PERIOD_HOUR, PERIOD_DAY],
+                vec![PeriodType::Hour, PeriodType::Day],
                 Some(IndexPath::new(1)),
                 window,
                 cx,
@@ -86,7 +86,7 @@ impl Bandmeter {
         let mut bandmeter = Self {
             period_type_select,
             exe_table,
-            period: Period::current(PERIOD_DAY),
+            period: Period::current(&PeriodType::Day),
             db_manager: DBManager::new(),
             stats: Stats::default(),
             focus_handle: cx.focus_handle(),
@@ -139,8 +139,8 @@ impl Bandmeter {
 
     fn on_period_type_select_change(
         &mut self,
-        _: &Entity<SelectState<Vec<&'static str>>>,
-        event: &SelectEvent<Vec<&'static str>>,
+        _: &Entity<SelectState<Vec<PeriodType>>>,
+        event: &SelectEvent<Vec<PeriodType>>,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {

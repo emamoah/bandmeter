@@ -1,11 +1,28 @@
 use chrono::Utc;
+use gpui::SharedString;
+use gpui_component::select::SelectItem;
 
 pub const SECS_MIN: i64 = 60;
 pub const SECS_HOUR: i64 = SECS_MIN * 60;
 pub const SECS_DAY: i64 = SECS_HOUR * 24;
 
-pub const PERIOD_HOUR: &str = "Hour";
-pub const PERIOD_DAY: &str = "Day";
+#[derive(Debug, Clone)]
+pub enum PeriodType {
+    Hour,
+    Day,
+}
+
+impl SelectItem for PeriodType {
+    type Value = Self;
+
+    fn title(&self) -> SharedString {
+        format!("{:?}", self).into()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Period {
@@ -14,11 +31,11 @@ pub enum Period {
 }
 
 impl Period {
-    pub fn current(period_type: &str) -> Self {
+    pub fn current(period_type: &PeriodType) -> Self {
         let now = Utc::now().timestamp();
         match period_type {
-            PERIOD_HOUR => Period::Hour(now - now % SECS_HOUR),
-            PERIOD_DAY | _ => Period::Day(now - now % SECS_DAY),
+            PeriodType::Hour => Period::Hour(now - now % SECS_HOUR),
+            PeriodType::Day => Period::Day(now - now % SECS_DAY),
         }
     }
 
