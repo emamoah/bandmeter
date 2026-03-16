@@ -146,7 +146,7 @@ impl Bandmeter {
     ) {
         match event {
             SelectEvent::Confirm(Some(period_type)) => {
-                self.period = Period::current(period_type);
+                self.period.switch(period_type);
             }
             _ => {}
         }

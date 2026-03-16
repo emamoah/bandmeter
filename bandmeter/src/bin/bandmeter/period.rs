@@ -74,4 +74,18 @@ impl Period {
             Period::Day(d) => *self = Period::Day(d + SECS_DAY),
         }
     }
+
+    pub fn switch(&mut self, to: &PeriodType) {
+        let (current_start, current_end) = self.bounds();
+
+        if Utc::now().timestamp() < current_end {
+            *self = Period::current(to);
+            return;
+        }
+
+        match to {
+            PeriodType::Hour => *self = Period::Hour(current_start - current_start % SECS_HOUR),
+            PeriodType::Day => *self = Period::Day(current_start - current_start % SECS_DAY),
+        }
+    }
 }
