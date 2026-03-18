@@ -1,30 +1,48 @@
 use crate::period::*;
 use chrono::{DateTime, Datelike, Local, TimeZone};
-use gpui::{App, ClickEvent, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px};
+use gpui::{
+    App, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, RenderOnce, Styled,
+    Window, div, px,
+};
 use gpui_component::{
     Disableable, IconName, Sizable,
     button::{Button, ButtonVariants},
     h_flex,
 };
 
-#[derive(IntoElement)]
-pub struct PeriodEditor {
+pub struct PeriodChangeEvent(pub Period);
+
+pub struct PeriodEditorState {
     period: Period,
-    on_prev: Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>,
-    on_next: Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>,
 }
 
-impl PeriodEditor {
-    pub fn new(
-        period: Period,
-        on_prev: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-        on_next: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        Self {
-            period,
-            on_prev: Box::new(on_prev),
-            on_next: Box::new(on_next),
-        }
+fn display_date(dt: &DateTime<Local>) -> String {
+    let now = Local::now();
+
+    let year_fmt = if dt.year() == now.year() {
+        dt.format("")
+    } else {
+        dt.format(" %Y")
+    };
+
+    format!("{}{}", dt.format("%d %b"), year_fmt)
+}
+
+fn display_date_if_not_today(dt: &DateTime<Local>) -> Option<String> {
+    let now = Local::now();
+    let now_time = now.timestamp();
+    let dt_time = dt.timestamp();
+
+    if now_time - now_time % SECS_DAY == dt_time - dt_time % SECS_DAY {
+        return None;
+    }
+
+    Some(display_date(dt))
+}
+
+impl PeriodEditorState {
+    pub fn new(period: Period, _: &mut Context<Self>) -> Self {
+        Self { period }
     }
 
     fn format_period(&self) -> String {
@@ -52,34 +70,32 @@ impl PeriodEditor {
             }
         }
     }
-}
 
-fn display_date(dt: &DateTime<Local>) -> String {
-    let now = Local::now();
-
-    let year_fmt = if dt.year() == now.year() {
-        dt.format("")
-    } else {
-        dt.format(" %Y")
-    };
-
-    format!("{}{}", dt.format("%d %b"), year_fmt)
-}
-
-fn display_date_if_not_today(dt: &DateTime<Local>) -> Option<String> {
-    let now = Local::now();
-    let now_time = now.timestamp();
-    let dt_time = dt.timestamp();
-
-    if now_time - now_time % SECS_DAY == dt_time - dt_time % SECS_DAY {
-        return None;
+    pub fn switch_period_type(&mut self, period_type: &PeriodType, cx: &mut Context<Self>) {
+        self.period.switch(period_type);
+        cx.emit(PeriodChangeEvent(self.period));
+        cx.notify();
     }
 
-    Some(display_date(dt))
+    pub fn prev(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.period.prev() {
+            cx.emit(PeriodChangeEvent(self.period));
+            cx.notify();
+        }
+    }
+
+    pub fn next(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.period.next() {
+            cx.emit(PeriodChangeEvent(self.period));
+            cx.notify();
+        }
+    }
 }
 
-impl RenderOnce for PeriodEditor {
-    fn render(self, _window: &mut gpui::Window, _cx: &mut gpui::App) -> impl IntoElement {
+impl EventEmitter<PeriodChangeEvent> for PeriodEditorState {}
+
+impl Render for PeriodEditorState {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let period_string = self.format_period();
 
         h_flex()
@@ -88,7 +104,7 @@ impl RenderOnce for PeriodEditor {
                 Button::new("period-prev")
                     .small()
                     .ghost()
-                    .on_click(self.on_prev)
+                    .on_click(cx.listener(|s, _, w, cx| s.prev(w, cx)))
                     .icon(IconName::ChevronLeft),
             )
             .child(
@@ -104,8 +120,27 @@ impl RenderOnce for PeriodEditor {
                     .disabled(self.period.is_current())
                     .small()
                     .ghost()
-                    .on_click(self.on_next)
+                    .on_click(cx.listener(|s, _, w, cx| s.next(w, cx)))
                     .icon(IconName::ChevronRight),
             )
+    }
+}
+
+#[derive(IntoElement)]
+pub struct PeriodEditor {
+    state: Entity<PeriodEditorState>,
+}
+
+impl PeriodEditor {
+    pub fn new(state: &Entity<PeriodEditorState>) -> Self {
+        Self {
+            state: state.clone(),
+        }
+    }
+}
+
+impl RenderOnce for PeriodEditor {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        div().child(self.state)
     }
 }

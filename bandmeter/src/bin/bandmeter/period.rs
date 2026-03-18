@@ -31,6 +31,10 @@ pub enum Period {
 }
 
 impl Period {
+    pub fn default() -> Self {
+        Self::current(&PeriodType::Day)
+    }
+
     pub fn current(period_type: &PeriodType) -> Self {
         let now = Utc::now().timestamp();
         match period_type {

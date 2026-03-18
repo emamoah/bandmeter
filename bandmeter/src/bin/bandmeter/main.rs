@@ -49,7 +49,7 @@ struct Stats {
 
 pub struct Bandmeter {
     period_type_select: Entity<SelectState<Vec<PeriodType>>>,
-    period: Period,
+    period_editor: Entity<PeriodEditorState>,
     db_manager: DBManager,
     stats: Stats,
     exe_table: Entity<TableState<ExeTable>>,
@@ -72,10 +72,10 @@ impl Bandmeter {
             Self::on_period_type_select_change,
         )
         .detach();
-        cx.bind_keys([
-            KeyBinding::new("left", Prev, Some(KEY_CX_PERIOD)),
-            KeyBinding::new("right", Next, Some(KEY_CX_PERIOD)),
-        ]);
+
+        let period_editor = cx.new(|cx| PeriodEditorState::new(Period::default(), cx));
+        cx.subscribe_in(&period_editor, window, Self::on_period_change)
+            .detach();
 
         let exe_table = cx.new(|cx| {
             TableState::new(ExeTable::new(), window, cx)
@@ -86,24 +86,24 @@ impl Bandmeter {
         let mut bandmeter = Self {
             period_type_select,
             exe_table,
-            period: Period::current(&PeriodType::Day),
+            period_editor,
             db_manager: DBManager::new(),
             stats: Stats::default(),
             focus_handle: cx.focus_handle(),
         };
-        bandmeter.query_stats(cx);
+        bandmeter.query_stats(Period::default(), cx);
 
         bandmeter
     }
 
-    fn query_stats(&mut self, cx: &mut Context<Self>) {
+    fn query_stats(&mut self, period: Period, cx: &mut Context<Self>) {
         self.stats.total_download = 0;
         self.stats.total_upload = 0;
 
-        self.stats.raw = self.db_manager.query_raw(self.period);
+        self.stats.raw = self.db_manager.query_raw(period);
 
-        let (period_start, period_end) = self.period.bounds();
-        let intvl = self.period.intvl_secs();
+        let (period_start, period_end) = period.bounds();
+        let intvl = period.intvl_secs();
 
         let mut stats_iter = self.stats.raw.iter().peekable();
 
@@ -137,6 +137,18 @@ impl Bandmeter {
         });
     }
 
+    fn on_period_change(
+        &mut self,
+        _: &Entity<PeriodEditorState>,
+        event: &PeriodChangeEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let period = event.0;
+        self.query_stats(period, cx);
+        cx.notify();
+    }
+
     fn on_period_type_select_change(
         &mut self,
         _: &Entity<SelectState<Vec<PeriodType>>>,
@@ -146,31 +158,11 @@ impl Bandmeter {
     ) {
         match event {
             SelectEvent::Confirm(Some(period_type)) => {
-                self.period.switch(period_type);
+                self.period_editor.update(cx, |it, cx| {
+                    it.switch_period_type(period_type, cx);
+                });
             }
             _ => {}
-        }
-        self.query_stats(cx);
-        cx.notify();
-    }
-
-    fn prev(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        self.period.prev();
-        self.query_stats(cx);
-        cx.notify();
-    }
-
-    fn next(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        if self.period.next() {
-            self.query_stats(cx);
-            cx.notify();
-        }
-    }
-
-    fn tick_margin(&self) -> usize {
-        match self.period {
-            Period::Hour(_) => 3,
-            Period::Day(_) => 3,
         }
     }
 
@@ -194,8 +186,16 @@ impl Render for Bandmeter {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .key_context(KEY_CX_PERIOD)
-            .on_action(cx.listener(|s, _: &Prev, w, cx| s.prev(w, cx)))
-            .on_action(cx.listener(|s, _: &Next, w, cx| s.next(w, cx)))
+            .on_action(
+                cx.listener(|s, _: &Prev, w, cx| {
+                    s.period_editor.update(cx, |it, cx| it.prev(w, cx))
+                }),
+            )
+            .on_action(
+                cx.listener(|s, _: &Next, w, cx| {
+                    s.period_editor.update(cx, |it, cx| it.next(w, cx))
+                }),
+            )
             .size_full()
             .child(
                 h_flex() // Top bar
@@ -209,11 +209,7 @@ impl Render for Bandmeter {
                             .flex_shrink_0()
                             .child(PeriodTypeSelect::new(&self.period_type_select)),
                     )
-                    .child(PeriodEditor::new(
-                        self.period,
-                        cx.listener(|s, _, w, cx| s.prev(w, cx)),
-                        cx.listener(|s, _, w, cx| s.next(w, cx)),
-                    ))
+                    .child(PeriodEditor::new(&self.period_editor))
                     .child(
                         h_flex().justify_end().w_20().child(
                             Button::new("settings")
@@ -233,7 +229,7 @@ impl Render for Bandmeter {
                         BandwidthChart {
                             // Consider a custom Entity to persist data
                             data: self.stats.by_time.clone(),
-                            tick_margin: self.tick_margin(),
+                            tick_margin: 3,
                             tick_fmt: Box::new(self.tick_fmt()),
                         }
                     }),
@@ -275,6 +271,10 @@ fn main() -> anyhow::Result<()> {
         let bounds = Bounds::centered(None, size(px(500.), px(500.)), cx);
         // This must be called before using any GPUI Component features.
         gpui_component::init(cx);
+        cx.bind_keys([
+            KeyBinding::new("left", Prev, Some(KEY_CX_PERIOD)),
+            KeyBinding::new("right", Next, Some(KEY_CX_PERIOD)),
+        ]);
 
         cx.spawn(async move |cx| {
             cx.open_window(
