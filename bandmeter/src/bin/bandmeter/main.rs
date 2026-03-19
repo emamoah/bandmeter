@@ -3,7 +3,6 @@ mod db;
 mod period;
 mod util;
 
-use crate::{components::*, db::*, period::*};
 use chrono::{Local, TimeZone};
 use gpui::*;
 use gpui_component::{
@@ -12,6 +11,8 @@ use gpui_component::{
     table::{Table, TableState},
     *,
 };
+
+use crate::{components::*, db::*, period::*};
 
 actions!([Prev, Next]);
 const KEY_CX_PERIOD: &str = "period";
@@ -91,18 +92,18 @@ impl Bandmeter {
             stats: Stats::default(),
             focus_handle: cx.focus_handle(),
         };
-        bandmeter.query_stats(Period::default(), cx);
+        bandmeter.query_stats(&Period::default(), cx);
 
         bandmeter
     }
 
-    fn query_stats(&mut self, period: Period, cx: &mut Context<Self>) {
+    fn query_stats(&mut self, period: &Period, cx: &mut Context<Self>) {
         self.stats.total_download = 0;
         self.stats.total_upload = 0;
 
         self.stats.raw = self.db_manager.query_raw(period);
 
-        let (period_start, period_end) = period.bounds();
+        let (period_start, period_end) = period.bounds_timestamp();
         let intvl = period.intvl_secs();
 
         let mut stats_iter = self.stats.raw.iter().peekable();
@@ -144,7 +145,7 @@ impl Bandmeter {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let period = event.0;
+        let period = &event.0;
         self.query_stats(period, cx);
         cx.notify();
     }

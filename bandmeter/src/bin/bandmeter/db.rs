@@ -61,8 +61,8 @@ impl DBManager {
         Ok(result)
     }
 
-    pub fn query_raw(&mut self, period: Period) -> Vec<Stat> {
-        let (start, end) = period.bounds();
+    pub fn query_raw(&mut self, period: &Period) -> Vec<Stat> {
+        let (start, end) = period.bounds_timestamp();
         self.do_query(
             "SELECT timestamp_utc, exe, raddr, send, recv FROM stats WHERE timestamp_utc >= ?1 AND timestamp_utc < ?2",
             [start, end],

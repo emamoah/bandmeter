@@ -1,5 +1,4 @@
-use crate::period::*;
-use chrono::{DateTime, Datelike, Local, TimeZone};
+use chrono::{DateTime, Datelike, Local, NaiveDate};
 use gpui::{
     App, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, RenderOnce, Styled,
     Window, div, px,
@@ -10,34 +9,36 @@ use gpui_component::{
     h_flex,
 };
 
+use crate::period::*;
+
 pub struct PeriodChangeEvent(pub Period);
 
 pub struct PeriodEditorState {
     period: Period,
 }
 
-fn display_date(dt: &DateTime<Local>) -> String {
+fn display_date(date: NaiveDate) -> String {
     let now = Local::now();
 
-    let year_fmt = if dt.year() == now.year() {
-        dt.format("")
+    let year_fmt = if date.year() == now.year() {
+        date.format("")
     } else {
-        dt.format(" %Y")
+        date.format(" %Y")
     };
 
-    format!("{}{}", dt.format("%d %b"), year_fmt)
+    format!("{}{}", date.format("%d %b"), year_fmt)
 }
 
 fn display_date_if_not_today(dt: &DateTime<Local>) -> Option<String> {
     let now = Local::now();
-    let now_time = now.timestamp();
-    let dt_time = dt.timestamp();
+    let dt_date = dt.date_naive();
+    let today = now.date_naive();
 
-    if now_time - now_time % SECS_DAY == dt_time - dt_time % SECS_DAY {
+    if dt_date == today {
         return None;
     }
 
-    Some(display_date(dt))
+    Some(display_date(dt_date))
 }
 
 impl PeriodEditorState {
@@ -49,25 +50,20 @@ impl PeriodEditorState {
         match self.period {
             Period::Hour(_) => {
                 let (start, end) = self.period.bounds();
-                let local_start = Local.timestamp_opt(start, 0).unwrap();
-                let local_end = Local.timestamp_opt(end, 0).unwrap();
 
                 format!(
                     "{}{} - {}{}",
-                    display_date_if_not_today(&local_start)
+                    display_date_if_not_today(&start)
                         .map(|d| d + ", ")
                         .unwrap_or_default(),
-                    local_start.format("%R"),
-                    display_date_if_not_today(&local_end)
+                    start.format("%R"),
+                    display_date_if_not_today(&end)
                         .map(|d| d + ", ")
                         .unwrap_or_default(),
-                    local_end.format("%R"),
+                    end.format("%R"),
                 )
             }
-            Period::Day(d) => {
-                let local = Local.timestamp_opt(d, 0).unwrap();
-                display_date(&local)
-            }
+            Period::Day(d) => display_date(d),
         }
     }
 
