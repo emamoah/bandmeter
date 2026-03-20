@@ -74,7 +74,7 @@ impl Bandmeter {
         )
         .detach();
 
-        let period_editor = cx.new(|cx| PeriodEditorState::new(Period::default(), cx));
+        let period_editor = cx.new(|cx| PeriodEditorState::new(Period::default(), window, cx));
         cx.subscribe_in(&period_editor, window, Self::on_period_change)
             .detach();
 
@@ -154,13 +154,13 @@ impl Bandmeter {
         &mut self,
         _: &Entity<SelectState<Vec<PeriodType>>>,
         event: &SelectEvent<Vec<PeriodType>>,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         match event {
             SelectEvent::Confirm(Some(period_type)) => {
                 self.period_editor.update(cx, |it, cx| {
-                    it.switch_period_type(period_type, cx);
+                    it.switch_period_type(period_type, window, cx);
                 });
             }
             _ => {}
