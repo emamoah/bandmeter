@@ -90,7 +90,6 @@ impl Period {
 
     pub fn prev(&mut self) -> bool {
         match *self {
-            // Unchecked arithmetic because it's *impractical* to under/overflow
             Period::Hour(h) => *self = Period::Hour(h.prev_hour()),
             Period::Day(d) => *self = Period::Day(d.prev()),
         }
