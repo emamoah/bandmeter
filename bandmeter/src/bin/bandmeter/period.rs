@@ -1,11 +1,10 @@
+use std::cmp::min;
+
 use chrono::{
     DateTime, Days, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, TimeZone, Timelike,
 };
 use gpui::SharedString;
 use gpui_component::select::SelectItem;
-
-pub const SECS_MIN: i64 = 60;
-pub const SECS_HOUR: i64 = SECS_MIN * 60;
 
 #[derive(Debug, Clone)]
 pub enum PeriodType {
@@ -22,6 +21,53 @@ impl SelectItem for PeriodType {
 
     fn value(&self) -> &Self::Value {
         &self
+    }
+}
+
+pub struct TimeBounds(pub DateTime<Local>, pub DateTime<Local>);
+
+impl TimeBounds {
+    pub fn timestamp(&self) -> (i64, i64) {
+        (self.0.timestamp(), self.1.timestamp())
+    }
+}
+
+pub struct Segments {
+    period_type: PeriodType,
+    seg_start: DateTime<Local>,
+    period_end: DateTime<Local>,
+}
+
+impl Segments {
+    pub fn timestamp(&mut self) -> impl Iterator<Item = (i64, i64)> {
+        self.into_iter().map(|s| s.timestamp())
+    }
+}
+
+impl Iterator for Segments {
+    type Item = TimeBounds;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.seg_start == self.period_end {
+            return None;
+        }
+
+        let seg_end = min(
+            self.period_end,
+            match self.period_type {
+                PeriodType::Hour => self
+                    .seg_start
+                    .checked_add_signed(TimeDelta::minutes(2))
+                    .unwrap(),
+                PeriodType::Day => self.seg_start.next_hour(),
+            },
+        );
+
+        let curr = TimeBounds(self.seg_start, seg_end);
+
+        self.seg_start = seg_end;
+
+        Some(curr)
     }
 }
 
@@ -53,39 +99,37 @@ impl Period {
         }
     }
 
+    pub fn period_type(&self) -> PeriodType {
+        match self {
+            Period::Hour(_) => PeriodType::Hour,
+            Period::Day(_) => PeriodType::Day,
+        }
+    }
+
+    pub fn segments(&self) -> Segments {
+        let TimeBounds(start, end) = self.bounds();
+
+        Segments {
+            period_type: self.period_type(),
+            seg_start: start,
+            period_end: end,
+        }
+    }
+
     pub fn is_current(&self) -> bool {
         Local::now() < self.bounds().1
     }
 
-    pub fn bounds(&self) -> (DateTime<Local>, DateTime<Local>) {
+    pub fn bounds(&self) -> TimeBounds {
         match *self {
-            Period::Hour(h) => (h, h.next_hour()),
+            Period::Hour(h) => TimeBounds(h, h.next_hour()),
             Period::Day(d) => {
                 let start = d.at_midnight().to_local();
                 let end = d.next().at_midnight().to_local();
 
-                (start, end)
+                TimeBounds(start, end)
             }
         }
-    }
-
-    pub fn bounds_timestamp(&self) -> (i64, i64) {
-        let (start, end) = self.bounds();
-        (start.timestamp(), end.timestamp())
-    }
-
-    pub fn intvl_secs(&self) -> i64 {
-        match self {
-            Period::Hour(_) => SECS_MIN * 2, // 2 min
-            Period::Day(_) => SECS_HOUR,
-        }
-    }
-
-    pub fn num_divisions(&self) -> usize {
-        let (period_start, period_end) = self.bounds_timestamp();
-        let intvl = self.intvl_secs();
-
-        (period_start..period_end).step_by(intvl as usize).count()
     }
 
     pub fn prev(&mut self) -> bool {

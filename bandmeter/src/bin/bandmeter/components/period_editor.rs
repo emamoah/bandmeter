@@ -75,7 +75,7 @@ impl PeriodEditorState {
     fn format_period(&self) -> String {
         match self.period {
             Period::Hour(_) => {
-                let (start, end) = self.period.bounds();
+                let TimeBounds(start, end) = self.period.bounds();
 
                 format!(
                     "{}{} - {}{}",

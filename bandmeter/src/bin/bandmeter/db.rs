@@ -62,7 +62,7 @@ impl DBManager {
     }
 
     pub fn query_raw(&mut self, period: &Period) -> Vec<Stat> {
-        let (start, end) = period.bounds_timestamp();
+        let (start, end) = period.bounds().timestamp();
         self.do_query(
             "SELECT timestamp_utc, exe, raddr, send, recv FROM stats WHERE timestamp_utc >= ?1 AND timestamp_utc < ?2",
             [start, end],
@@ -77,7 +77,7 @@ impl DBManager {
                     recv: row.get::<_, i64>(4)? as u64,
                 })
             },
-            period.num_divisions()
+            period.segments().count() // Maybe implement size_hint()?
         ).context("error querying database").map_err(|e| eprintln!("Error: {e:?}"))
         .ok()
         .unwrap_or_else(Vec::new)

@@ -103,21 +103,19 @@ impl Bandmeter {
 
         self.stats.raw = self.db_manager.query_raw(period);
 
-        let (period_start, period_end) = period.bounds_timestamp();
-        let intvl = period.intvl_secs();
-
         let mut stats_iter = self.stats.raw.iter().peekable();
 
-        let by_time = (period_start..period_end)
-            .step_by(intvl as usize)
-            .map(|timestamp| {
+        let by_time = period
+            .segments()
+            .timestamp()
+            .map(|(seg_start, seg_end)| {
                 let mut time_stat = TimeStat {
-                    timestamp,
+                    timestamp: seg_start,
                     ..Default::default()
                 };
 
                 while let Some(next) = stats_iter.peek()
-                    && next.timestamp - timestamp < intvl
+                    && next.timestamp < seg_end
                 {
                     let next = stats_iter.next().unwrap();
                     time_stat.download += next.recv;
