@@ -61,7 +61,12 @@ impl Bandmeter {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let period_type_select = cx.new(|cx| {
             SelectState::new(
-                vec![PeriodType::Hour, PeriodType::Day],
+                vec![
+                    PeriodType::Hour,
+                    PeriodType::Day,
+                    PeriodType::Week,
+                    PeriodType::Month,
+                ],
                 Some(IndexPath::new(1)),
                 window,
                 cx,
@@ -164,15 +169,6 @@ impl Bandmeter {
             _ => {}
         }
     }
-
-    fn tick_fmt(&self) -> impl Fn(&TimeStat) -> String + 'static {
-        |stat| {
-            format!(
-                "{}",
-                Local.timestamp_opt(stat.timestamp, 0).unwrap().format("%R")
-            )
-        }
-    }
 }
 
 impl Focusable for Bandmeter {
@@ -228,8 +224,11 @@ impl Render for Bandmeter {
                         BandwidthChart {
                             // Consider a custom Entity to persist data
                             data: self.stats.by_time.clone(),
-                            tick_margin: 3,
-                            tick_fmt: Box::new(self.tick_fmt()),
+                            period_type: *self
+                                .period_type_select
+                                .read(cx)
+                                .selected_value()
+                                .unwrap(),
                         }
                     }),
             )

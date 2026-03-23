@@ -1,15 +1,18 @@
 use std::cmp::min;
 
 use chrono::{
-    DateTime, Days, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, TimeZone, Timelike,
+    DateTime, Datelike, Days, Local, Months, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
+    TimeZone, Timelike, Weekday,
 };
 use gpui::SharedString;
 use gpui_component::select::SelectItem;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum PeriodType {
     Hour,
     Day,
+    Week,
+    Month,
 }
 
 impl SelectItem for PeriodType {
@@ -60,6 +63,9 @@ impl Iterator for Segments {
                     .checked_add_signed(TimeDelta::minutes(2))
                     .unwrap(),
                 PeriodType::Day => self.seg_start.next_hour(),
+                PeriodType::Week | PeriodType::Month => {
+                    self.seg_start.date_naive().next().at_midnight().to_local()
+                }
             },
         );
 
@@ -75,6 +81,8 @@ impl Iterator for Segments {
 pub enum Period {
     Hour(DateTime<Local>),
     Day(NaiveDate),
+    Week(NaiveDate),
+    Month(NaiveDate),
 }
 
 impl Period {
@@ -86,16 +94,10 @@ impl Period {
         let now = Local::now();
 
         match period_type {
-            PeriodType::Hour => {
-                let hour = now.with_hour_only(now.hour());
-
-                Period::Hour(hour)
-            }
-            PeriodType::Day => {
-                let day = now.date_naive();
-
-                Period::Day(day)
-            }
+            PeriodType::Hour => Period::Hour(now.with_hour_only(now.hour())),
+            PeriodType::Day => Period::Day(now.date_naive()),
+            PeriodType::Week => Period::Week(now.date_naive().week(Weekday::Sun).first_day()),
+            PeriodType::Month => Period::Month(now.date_naive().with_day(1).unwrap()),
         }
     }
 
@@ -103,6 +105,8 @@ impl Period {
         match self {
             Period::Hour(_) => PeriodType::Hour,
             Period::Day(_) => PeriodType::Day,
+            Period::Week(_) => PeriodType::Week,
+            Period::Month(_) => PeriodType::Month,
         }
     }
 
@@ -129,6 +133,18 @@ impl Period {
 
                 TimeBounds(start, end)
             }
+            Period::Week(w) => {
+                let start = w.at_midnight().to_local();
+                let end = w.add_days(7).at_midnight().to_local();
+
+                TimeBounds(start, end)
+            }
+            Period::Month(m) => {
+                let start = m.at_midnight().to_local();
+                let end = m.add_months(1).at_midnight().to_local();
+
+                TimeBounds(start, end)
+            }
         }
     }
 
@@ -136,6 +152,8 @@ impl Period {
         match *self {
             Period::Hour(h) => *self = Period::Hour(h.prev_hour()),
             Period::Day(d) => *self = Period::Day(d.prev()),
+            Period::Week(w) => *self = Period::Week(w.sub_days(7)),
+            Period::Month(m) => *self = Period::Month(m.sub_months(1)),
         }
 
         true
@@ -149,6 +167,8 @@ impl Period {
         match *self {
             Period::Hour(h) => *self = Period::Hour(h.next_hour()),
             Period::Day(d) => *self = Period::Day(d.next()),
+            Period::Week(w) => *self = Period::Week(w.add_days(7)),
+            Period::Month(m) => *self = Period::Month(m.add_months(1)),
         }
 
         true
@@ -165,6 +185,10 @@ impl Period {
         match to_type {
             PeriodType::Hour => *self = Period::Hour(start.with_hour_only(start.hour())),
             PeriodType::Day => *self = Period::Day(start.date_naive()),
+            PeriodType::Week => {
+                *self = Period::Week(start.date_naive().week(Weekday::Sun).first_day())
+            }
+            PeriodType::Month => *self = Period::Month(start.date_naive().with_day(1).unwrap()),
         }
     }
 }
@@ -175,6 +199,10 @@ pub trait NaiveDateExt {
     fn at_midnight(&self) -> NaiveDateTime;
     fn prev(self) -> NaiveDate;
     fn next(self) -> NaiveDate;
+    fn add_days(self, days: u64) -> NaiveDate;
+    fn sub_days(self, days: u64) -> NaiveDate;
+    fn add_months(self, months: u32) -> NaiveDate;
+    fn sub_months(self, months: u32) -> NaiveDate;
 }
 
 impl NaiveDateExt for NaiveDate {
@@ -188,6 +216,22 @@ impl NaiveDateExt for NaiveDate {
 
     fn next(self) -> NaiveDate {
         self.checked_add_days(Days::new(1)).unwrap()
+    }
+
+    fn add_days(self, days: u64) -> NaiveDate {
+        self.checked_add_days(Days::new(days)).unwrap()
+    }
+
+    fn sub_days(self, days: u64) -> NaiveDate {
+        self.checked_sub_days(Days::new(days)).unwrap()
+    }
+
+    fn add_months(self, months: u32) -> NaiveDate {
+        self.checked_add_months(Months::new(months)).unwrap()
+    }
+
+    fn sub_months(self, months: u32) -> NaiveDate {
+        self.checked_sub_months(Months::new(months)).unwrap()
     }
 }
 

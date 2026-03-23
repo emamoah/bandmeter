@@ -1,4 +1,4 @@
-use crate::{util::*, *};
+use chrono::Datelike;
 use gpui::{
     App, Bounds, FontWeight, PathBuilder, Pixels, SharedString, TextAlign, TextRun, Window, point,
     px, rems,
@@ -12,15 +12,53 @@ use gpui_component::{
     },
 };
 
+use crate::{util::*, *};
+
 #[derive(IntoPlot)]
 pub struct BandwidthChart {
     pub data: Vec<TimeStat>,
-    pub tick_margin: usize,
-    pub tick_fmt: Box<dyn Fn(&TimeStat) -> String>,
+    pub period_type: PeriodType,
+}
+
+impl BandwidthChart {
+    fn tick_margin(&self) -> usize {
+        match self.period_type {
+            PeriodType::Hour | PeriodType::Day => 3,
+            PeriodType::Week | PeriodType::Month => 1,
+        }
+    }
+
+    fn tick_fmt(&self) -> impl Fn(&TimeStat) -> String {
+        |stat| {
+            let fmt = match self.period_type {
+                PeriodType::Hour | PeriodType::Day => {
+                    Local.timestamp_opt(stat.timestamp, 0).unwrap().format("%R")
+                }
+                PeriodType::Week => {
+                    let date = Local.timestamp_opt(stat.timestamp, 0).unwrap().date_naive();
+
+                    if date.day() == 1 {
+                        date.format("%a %d %b")
+                    } else {
+                        date.format("%a %d")
+                    }
+                }
+                PeriodType::Month => Local
+                    .timestamp_opt(stat.timestamp, 0)
+                    .unwrap()
+                    .format("%-e"),
+            };
+
+            format!("{}", fmt)
+        }
+    }
 }
 
 impl Plot for BandwidthChart {
     fn paint(&mut self, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App) {
+        let tick_margin = self.tick_margin();
+        let tick_fmt = self.tick_fmt();
+
         if self.data.is_empty() {
             return;
         }
@@ -68,10 +106,10 @@ impl Plot for BandwidthChart {
 
         // Draw X axis
         let x_label = self.data.iter().enumerate().filter_map(|(i, d)| {
-            if i > 0 && i % self.tick_margin == 0 {
+            if i > 0 && i % tick_margin == 0 {
                 x_scale.tick(&d.timestamp).map(|x_tick| {
                     AxisText::new(
-                        (*self.tick_fmt)(&d),
+                        tick_fmt(&d),
                         x_tick - halfway_between_bands,
                         cx.theme().muted_foreground,
                     )
@@ -144,9 +182,9 @@ impl Plot for BandwidthChart {
         // Tick dots
         let mut tick_dots = PathBuilder::stroke(px(dot_width * 2.)).dash_array(&[
             px(dot_width),
-            px((interval - dot_width) + interval * (self.tick_margin - 1) as f32),
+            px((interval - dot_width) + interval * (tick_margin - 1) as f32),
         ]);
-        let dots_x_start = dots_x_start + (interval * self.tick_margin as f32);
+        let dots_x_start = dots_x_start + (interval * tick_margin as f32);
         let dots_x_end = dots_x_end - dot_width;
 
         tick_dots.move_to(bounds.origin + point(px(dots_x_start), px(dots_y + half_dot_width)));

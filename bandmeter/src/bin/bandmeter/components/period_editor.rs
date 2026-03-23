@@ -90,6 +90,22 @@ impl PeriodEditorState {
                 )
             }
             Period::Day(d) => display_date(d),
+            Period::Week(w) => {
+                let (start, end) = (w, w.add_days(6));
+
+                format!("{} - {}", display_date(start), display_date(end))
+            }
+            Period::Month(m) => {
+                let this_year = Local::now().year();
+
+                let fmt = if m.year() == this_year {
+                    m.format("%B")
+                } else {
+                    m.format("%B %Y")
+                };
+
+                format!("{fmt}")
+            }
         }
     }
 
