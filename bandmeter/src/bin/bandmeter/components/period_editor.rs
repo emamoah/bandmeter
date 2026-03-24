@@ -38,9 +38,8 @@ fn display_date(date: NaiveDate) -> String {
 }
 
 fn display_date_if_not_today(dt: &DateTime<Local>) -> Option<String> {
-    let now = Local::now();
     let dt_date = dt.date_naive();
-    let today = now.date_naive();
+    let today = Local::now().date_naive();
 
     if dt_date == today {
         return None;
@@ -78,14 +77,11 @@ impl PeriodEditorState {
                 let TimeBounds(start, end) = self.period.bounds();
 
                 format!(
-                    "{}{} - {}{}",
+                    "{}{} - {}",
                     display_date_if_not_today(&start)
                         .map(|d| d + ", ")
                         .unwrap_or_default(),
                     start.format("%R"),
-                    display_date_if_not_today(&end)
-                        .map(|d| d + ", ")
-                        .unwrap_or_default(),
                     end.format("%R"),
                 )
             }
