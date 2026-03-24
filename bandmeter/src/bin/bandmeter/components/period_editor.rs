@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Local, NaiveDate};
+use chrono::{DateTime, Datelike, Local, NaiveDate, Weekday};
 use gpui::{
     App, AppContext, Bounds, ClickEvent, Context, Entity, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, ParentElement, Pixels, Render, RenderOnce, Styled,
@@ -112,7 +112,7 @@ impl PeriodEditorState {
         update: impl Fn(&mut Period) -> bool,
     ) {
         if update(&mut self.period) {
-            if let Period::Day(date) = self.period {
+            if let Period::Day(date) | Period::Week(date) = self.period {
                 self.calendar.update(cx, |it, cx| {
                     it.set_date(date, window, cx);
                 })
@@ -133,7 +133,11 @@ impl PeriodEditorState {
         match ev {
             CalendarEvent::Selected(Date::Single(Some(date))) => {
                 self.update_period(window, cx, |p| {
-                    *p = Period::Day(*date);
+                    *p = if let PeriodType::Week = p.period_type() {
+                        Period::Week(date.week(Weekday::Sun).first_day())
+                    } else {
+                        Period::Day(*date)
+                    };
                     true
                 });
 
@@ -226,7 +230,7 @@ impl Render for PeriodEditorState {
                                     .child(div().text_xs().child(period_string)),
                             )
                             .child(div().flex().justify_center().when(
-                                matches!(self.period, Period::Day(_)),
+                                matches!(self.period, Period::Day(_) | Period::Week(_)),
                                 |this| {
                                     this.child(
                                         Calendar::new(&self.calendar)
