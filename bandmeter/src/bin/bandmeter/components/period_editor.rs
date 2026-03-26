@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Local, NaiveDate, Weekday};
+use chrono::{DateTime, Datelike, Local, NaiveDate, Timelike, Weekday};
 use gpui::{
     App, AppContext, Bounds, ClickEvent, Context, Entity, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, ParentElement, Pixels, Render, RenderOnce, Styled,
@@ -12,13 +12,17 @@ use gpui_component::{
     popover::Popover,
 };
 
-use crate::period::*;
+use crate::{
+    components::{HourChangeEvent, HourPicker, HourPickerState},
+    period::*,
+};
 
 pub struct PeriodChangeEvent(pub Period);
 
 pub struct PeriodEditorState {
     period: Period,
     calendar: Entity<CalendarState>,
+    hour_picker: Entity<HourPickerState>,
     open: bool,
     trigger_bounds: Entity<Bounds<Pixels>>,
     focus_handle: FocusHandle,
@@ -51,24 +55,32 @@ fn display_date_if_not_today(dt: &DateTime<Local>) -> Option<String> {
 impl PeriodEditorState {
     pub fn new(period: Period, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let calendar = cx.new(|cx| {
-            let date = period.bounds().0.date_naive();
             let tomorrow = Local::now().date_naive().next();
-            let mut cal = CalendarState::new(window, cx)
-                .disabled_matcher(calendar::Matcher::range(Some(tomorrow), None));
-            cal.set_date(date, window, cx);
-            cal
+
+            CalendarState::new(window, cx)
+                .disabled_matcher(calendar::Matcher::range(Some(tomorrow), None))
         });
 
-        let _subscriptions = vec![cx.subscribe_in(&calendar, window, Self::on_day_change)];
+        let hour_picker = cx.new(|cx| HourPickerState::new(window, cx));
 
-        Self {
+        let _subscriptions = vec![
+            cx.subscribe_in(&calendar, window, Self::on_day_change),
+            cx.subscribe_in(&hour_picker, window, Self::on_hour_change),
+        ];
+
+        let mut state = Self {
             period,
             calendar,
+            hour_picker,
             open: false,
             trigger_bounds: cx.new(|_| Bounds::default()),
             focus_handle: cx.focus_handle(),
             _subscriptions,
-        }
+        };
+
+        state.update_period(window, cx, |_| true);
+
+        state
     }
 
     fn format_period(&self) -> String {
@@ -118,9 +130,33 @@ impl PeriodEditorState {
                 })
             }
 
+            if let Period::Hour(dt) = self.period {
+                self.hour_picker.update(cx, |it, cx| {
+                    it.set(dt.date_naive(), dt.hour(), window, cx);
+                })
+            }
+
             cx.emit(PeriodChangeEvent(self.period));
             cx.notify();
         }
+    }
+
+    fn on_hour_change(
+        &mut self,
+        _: &Entity<HourPickerState>,
+        ev: &HourChangeEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let HourChangeEvent { date, hour } = *ev;
+        self.update_period(window, cx, |p| {
+            *p = Period::Hour(date.and_hour(hour).to_local());
+            true
+        });
+
+        self.open = false;
+        self.focus_handle.focus(window);
+        cx.notify();
     }
 
     fn on_day_change(
@@ -143,6 +179,7 @@ impl PeriodEditorState {
 
                 self.open = false;
                 self.focus_handle.focus(window);
+                cx.notify();
             }
             _ => {}
         }
@@ -229,16 +266,27 @@ impl Render for PeriodEditorState {
                                     .on_click(cx.listener(Self::toggle_open))
                                     .child(div().text_xs().child(period_string)),
                             )
-                            .child(div().flex().justify_center().when(
-                                matches!(self.period, Period::Day(_) | Period::Week(_)),
-                                |this| {
-                                    this.child(
-                                        Calendar::new(&self.calendar)
-                                            .small()
-                                            .bg(cx.theme().popover),
+                            .child(
+                                div()
+                                    .flex()
+                                    .justify_center()
+                                    .when(
+                                        matches!(self.period, Period::Day(_) | Period::Week(_)),
+                                        |this| {
+                                            this.child(
+                                                Calendar::new(&self.calendar)
+                                                    .small()
+                                                    .bg(cx.theme().popover),
+                                            )
+                                        },
                                     )
-                                },
-                            )),
+                                    .when(matches!(self.period, Period::Hour(_)), |this| {
+                                        this.child(
+                                            HourPicker::new(&self.hour_picker)
+                                                .bg(cx.theme().popover),
+                                        )
+                                    }),
+                            ),
                     ),
             )
             .child(

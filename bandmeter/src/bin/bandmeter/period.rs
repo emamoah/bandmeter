@@ -86,10 +86,6 @@ pub enum Period {
 }
 
 impl Period {
-    pub fn default() -> Self {
-        Self::current(&PeriodType::Day)
-    }
-
     pub fn current(period_type: &PeriodType) -> Self {
         let now = Local::now();
 
@@ -197,6 +193,7 @@ impl Period {
 
 pub trait NaiveDateExt {
     fn at_midnight(&self) -> NaiveDateTime;
+    fn and_hour(&self, hour: u32) -> NaiveDateTime;
     fn prev(self) -> NaiveDate;
     fn next(self) -> NaiveDate;
     fn add_days(self, days: u64) -> NaiveDate;
@@ -208,6 +205,10 @@ pub trait NaiveDateExt {
 impl NaiveDateExt for NaiveDate {
     fn at_midnight(&self) -> NaiveDateTime {
         self.and_hms_opt(0, 0, 0).unwrap()
+    }
+
+    fn and_hour(&self, hour: u32) -> NaiveDateTime {
+        self.and_hms_opt(hour, 0, 0).unwrap()
     }
 
     fn prev(self) -> NaiveDate {

@@ -79,7 +79,14 @@ impl Bandmeter {
         )
         .detach();
 
-        let period_editor = cx.new(|cx| PeriodEditorState::new(Period::default(), window, cx));
+        let init_period_type = period_type_select
+            .read(cx)
+            .selected_value()
+            .unwrap()
+            .clone();
+
+        let period_editor =
+            cx.new(|cx| PeriodEditorState::new(Period::current(&init_period_type), window, cx));
         cx.subscribe_in(&period_editor, window, Self::on_period_change)
             .detach();
 
@@ -97,7 +104,7 @@ impl Bandmeter {
             stats: Stats::default(),
             focus_handle: cx.focus_handle(),
         };
-        bandmeter.query_stats(&Period::default(), cx);
+        bandmeter.query_stats(&Period::current(&init_period_type), cx);
 
         bandmeter
     }

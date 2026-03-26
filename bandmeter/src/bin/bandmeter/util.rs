@@ -1,3 +1,10 @@
+use gpui::{App, Pixels};
+use gpui_component::ActiveTheme;
+
+pub fn rems_to_px(rems: f32, cx: &mut App) -> Pixels {
+    gpui::rems(rems).to_pixels(cx.theme().font_size)
+}
+
 pub fn format_bytes(num: u64) -> String {
     const KB: u64 = 1000;
     const MB: u64 = KB * 1000;
