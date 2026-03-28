@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::cmp::{min, min_by};
 
 use chrono::{
     DateTime, Datelike, Days, Local, Months, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta,
@@ -242,7 +242,15 @@ pub trait NaiveDateTimeExt {
 
 impl NaiveDateTimeExt for NaiveDateTime {
     fn to_local(&self) -> DateTime<Local> {
-        Local.from_local_datetime(self).unwrap()
+        use chrono::offset::LocalResult;
+
+        match Local.from_local_datetime(self) {
+            LocalResult::Single(dt) => dt,
+            LocalResult::Ambiguous(dt1, dt2) => {
+                min_by(dt1, dt2, |a, b| a.timestamp().cmp(&b.timestamp()))
+            }
+            res => res.unwrap(),
+        }
     }
 }
 
