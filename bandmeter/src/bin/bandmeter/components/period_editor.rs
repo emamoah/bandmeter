@@ -1,8 +1,8 @@
 use chrono::{DateTime, Datelike, Local, NaiveDate, Timelike, Weekday};
 use gpui::{
     App, AppContext, Bounds, ClickEvent, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, ParentElement, Pixels, Render, RenderOnce, Styled,
-    Subscription, Window, canvas, div, prelude::FluentBuilder, px,
+    InteractiveElement, IntoElement, ParentElement, Pixels, Render, RenderOnce, SharedString,
+    Styled, Subscription, Window, canvas, div, prelude::FluentBuilder, px,
 };
 use gpui_component::{
     ActiveTheme, Disableable, IconName, Sizable,
@@ -21,6 +21,8 @@ pub struct PeriodChangeEvent(pub Period);
 
 pub struct PeriodEditorState {
     period: Period,
+    format: SharedString,
+    is_current: bool,
     calendar: Entity<CalendarState>,
     hour_picker: Entity<HourPickerState>,
     open: bool,
@@ -70,6 +72,8 @@ impl PeriodEditorState {
 
         let mut state = Self {
             period,
+            format: SharedString::default(),
+            is_current: false,
             calendar,
             hour_picker,
             open: false,
@@ -83,7 +87,7 @@ impl PeriodEditorState {
         state
     }
 
-    fn format_period(&self) -> String {
+    fn format_period(&self) -> SharedString {
         match self.period {
             Period::Hour(_) => {
                 let TimeBounds(start, end) = self.period.bounds();
@@ -115,6 +119,7 @@ impl PeriodEditorState {
                 format!("{fmt}")
             }
         }
+        .into()
     }
 
     fn update_period(
@@ -135,6 +140,9 @@ impl PeriodEditorState {
                     it.set(dt.date_naive(), dt.hour(), window, cx);
                 })
             }
+
+            self.is_current = self.period.is_current();
+            self.format = self.format_period();
 
             cx.emit(PeriodChangeEvent(self.period));
             cx.notify();
@@ -224,8 +232,6 @@ impl EventEmitter<PeriodChangeEvent> for PeriodEditorState {}
 
 impl Render for PeriodEditorState {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let period_string = self.format_period();
-
         h_flex()
             .gap_x_1()
             .child(
@@ -264,7 +270,7 @@ impl Render for PeriodEditorState {
                                     .text_xs()
                                     .ghost()
                                     .on_click(cx.listener(Self::toggle_open))
-                                    .child(div().text_xs().child(period_string)),
+                                    .child(div().text_xs().child(self.format.clone())),
                             )
                             .child(
                                 div()
@@ -291,7 +297,7 @@ impl Render for PeriodEditorState {
             )
             .child(
                 Button::new("period-next")
-                    .disabled(self.period.is_current())
+                    .disabled(self.is_current)
                     .small()
                     .ghost()
                     .on_click(cx.listener(|s, _, w, cx| s.next(w, cx)))
